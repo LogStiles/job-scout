@@ -60,12 +60,20 @@ def test_parse_wwrr_entry_missing_region():
     assert job["location"] is None
 
 
-def test_parse_wwrr_entry_strips_html():
+def test_parse_wwrr_entry_strips_html_and_decodes_entities():
     job = feeds.parse_wwrr_entry(
-        {"title": "Co: Eng", "link": "x", "summary": "<p>Java &amp; <b>Spring</b>.</p>"}
+        {
+            "title": "Co: Eng",
+            "link": "x",
+            "summary": "<p>Java&nbsp;&amp; <b>Spring</b>; we&#8217;re hiring</p>",
+        }
     )
-    assert "<" not in job["description"] and ">" not in job["description"]
-    assert "Spring" in job["description"]
+    desc = job["description"]
+    assert "<" not in desc and ">" not in desc
+    # Entities are decoded (&amp; -> &, &#8217; -> ’, &nbsp; -> space), not left raw.
+    assert "&amp;" not in desc and "&#" not in desc and "&nbsp;" not in desc
+    assert "Java & Spring" in desc
+    assert "we’re hiring" in desc
 
 
 def test_fetch_wwrr_dedupes_across_categories(monkeypatch):

@@ -5,9 +5,12 @@ shape the rest of the app consumes:
 
     {"url", "title", "company", "location", "description", "source"}
 
-`url`/`title`/`company`/`location`/`description` are exactly the keys
-`database.mark_seen` and `scorer.score` expect, so `fetch()` output drops
-straight into the pipeline.
+`url`/`title`/`company`/`location`/`description` are the keys `database.mark_seen`
+and `scorer.score` consume; `source` is an extra tag for logging/debugging.
+`mark_seen` has no `source` parameter, so pass the subset rather than `**job`:
+
+    database.mark_seen(url=job["url"], title=job["title"], company=job["company"],
+                       location=job["location"], description=job["description"])
 
 Sources:
   - **We Work Remotely** (working) — real per-category RSS feeds. The active
@@ -22,6 +25,7 @@ When config.py exists, the per-source search parameters here should move there
 
 from __future__ import annotations
 
+import html
 import re
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Mapping, Sequence
@@ -36,8 +40,13 @@ _WS_RE = re.compile(r"\s+")
 
 
 def _strip_html(text: str) -> str:
-    """Collapse an HTML summary into plain-ish text."""
-    return _WS_RE.sub(" ", _TAG_RE.sub(" ", text)).strip()
+    """Collapse an HTML summary into plain-ish text.
+
+    Strips tags, then decodes HTML entities (`&amp;`, `&#8217;`, `&nbsp;`, …) so
+    the scorer reads real text rather than entity noise, then collapses
+    whitespace (including the non-breaking spaces `&nbsp;` decodes to).
+    """
+    return _WS_RE.sub(" ", html.unescape(_TAG_RE.sub(" ", text))).strip()
 
 
 def _collect(
