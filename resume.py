@@ -14,7 +14,7 @@ import anthropic
 from docx import Document as _DocxDocument
 from pydantic import BaseModel, Field
 
-from scorer import MODEL, PROFILE_PATH, Profile, save_default_profile
+from scorer import MAX_TOKENS, MODEL, PROFILE_PATH, Profile, save_default_profile
 
 
 class DistilledProfile(BaseModel):
@@ -56,21 +56,23 @@ class DistilledProfile(BaseModel):
 
     def to_profile(self) -> Profile:
         """Render into the bullet-point format scorer.build_prompt expects."""
-        skills = ", ".join(self.core_skills) if self.core_skills else "Not specified"
-        soft = ", ".join(self.soft_skills) if self.soft_skills else "Not specified"
-        domains = (
-            ", ".join(self.preferred_domains)
-            if self.preferred_domains
-            else "Not specified"
-        )
+
+        def listed(items: List[str]) -> str:
+            return ", ".join(items) if items else "Not specified"
+
+        def stated(value: str, fallback: str = "Not specified") -> str:
+            # Guard against the model returning an empty/whitespace string for a
+            # field, which would otherwise render a blank, ambiguous profile line.
+            return value.strip() if value and value.strip() else fallback
+
         text = (
-            f"- Title target: {self.title_target}\n"
-            f"- Core skills: {skills}\n"
-            f"- Soft skills (projects/education, limited professional experience): {soft}\n"
+            f"- Title target: {stated(self.title_target)}\n"
+            f"- Core skills: {listed(self.core_skills)}\n"
+            f"- Soft skills (projects/education, limited professional experience): {listed(self.soft_skills)}\n"
             f"- Years of experience: {self.years_experience}\n"
-            f"- Location: {self.location}\n"
-            f"- Preferred domains: {domains}\n"
-            f"- Hard disqualifiers: {self.hard_disqualifiers}"
+            f"- Location: {stated(self.location)}\n"
+            f"- Preferred domains: {listed(self.preferred_domains)}\n"
+            f"- Hard disqualifiers: {stated(self.hard_disqualifiers, 'None specified')}"
         )
         return Profile(text=text)
 
@@ -103,7 +105,13 @@ def extract_docx_text(path: str) -> str:
     parts: List[str] = [p.text for p in document.paragraphs if p.text.strip()]
     for table in document.tables:
         for row in table.rows:
-            cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+            # A merged cell is repeated once per underlying grid column in
+            # row.cells, so collapse consecutive duplicates before joining.
+            cells: List[str] = []
+            for cell in row.cells:
+                text = cell.text.strip()
+                if text and (not cells or cells[-1] != text):
+                    cells.append(text)
             if cells:
                 parts.append(" | ".join(cells))
     return "\n".join(parts)
@@ -123,7 +131,7 @@ def distill_profile(
     client = client or anthropic.Anthropic()
     response = client.messages.parse(
         model=MODEL,
-        max_tokens=2048,
+        max_tokens=MAX_TOKENS,
         thinking={"type": "adaptive"},
         messages=[
             {

@@ -87,6 +87,17 @@ def test_to_profile_empty_core_and_domains_are_not_specified():
     assert "- Preferred domains: Not specified" in text
 
 
+def test_to_profile_empty_string_fields_fall_back():
+    # If the model returns blank strings, render sensible placeholders rather
+    # than dangling "- Location: " lines.
+    text = _full_distilled(
+        title_target="   ", location="", hard_disqualifiers=""
+    ).to_profile().text
+    assert "- Title target: Not specified" in text
+    assert "- Location: Not specified" in text
+    assert "- Hard disqualifiers: None specified" in text
+
+
 def test_to_profile_hard_disqualifiers_defaults():
     # hard_disqualifiers and soft_skills both have defaults.
     dp = resume.DistilledProfile(
@@ -129,6 +140,20 @@ def test_extract_docx_text_skips_empty_paragraphs(tmp_path):
     path = _write_docx(tmp_path / "r.docx", paragraphs=["Real", "   ", "", "Content"])
     text = resume.extract_docx_text(path)
     assert text == "Real\nContent"
+
+
+def test_extract_docx_text_dedups_merged_cells(tmp_path):
+    # A merged cell repeats across grid columns in row.cells; it should appear
+    # once, not once per spanned column.
+    doc = Document()
+    table = doc.add_table(rows=1, cols=3)
+    merged = table.cell(0, 0).merge(table.cell(0, 2))
+    merged.text = "Spanned Header"
+    path = str(tmp_path / "merged.docx")
+    doc.save(path)
+
+    text = resume.extract_docx_text(path)
+    assert text == "Spanned Header"
 
 
 # --- error paths (no API needed) -------------------------------------------

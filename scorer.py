@@ -18,6 +18,11 @@ from pydantic import BaseModel, Field
 
 MODEL = "claude-opus-4-8"
 
+# Adaptive thinking tokens count against max_tokens, so keep a generous budget:
+# a low cap can truncate the response before the JSON completes. Well under the
+# SDK's non-streaming HTTP-timeout threshold for these small outputs.
+MAX_TOKENS = 8192
+
 # The default candidate profile lives in profile.txt next to this module so it
 # can be swapped out (e.g. via `resume.py --set-default`) without editing code.
 # The file is gitignored — this constant is the built-in fallback used when it
@@ -107,7 +112,7 @@ def score(
     # so we never have to parse free-form text or handle stray prose.
     response = client.messages.parse(
         model=MODEL,
-        max_tokens=2048,
+        max_tokens=MAX_TOKENS,
         thinking={"type": "adaptive"},
         messages=[{"role": "user", "content": prompt}],
         output_format=Score,
