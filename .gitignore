@@ -1,4 +1,5 @@
 .env
+CLAUDE.md
 
 # Personal default candidate profile (may be overwritten via `resume.py --set-default`)
 profile.txt
