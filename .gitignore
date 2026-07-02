@@ -6,3 +6,6 @@ profile.txt
 # Python
 __pycache__/
 *.pyc
+
+# SQLite database
+*.db
