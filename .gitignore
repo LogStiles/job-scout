@@ -1,0 +1,8 @@
+.env
+
+# Personal default candidate profile (may be overwritten via `resume.py --set-default`)
+profile.txt
+
+# Python
+__pycache__/
+*.pyc
